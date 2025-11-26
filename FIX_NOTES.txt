@@ -1,0 +1,25 @@
+FIXED: Template Path Error in Executable
+
+PROBLEM:
+The executable was looking for templates in the wrong location because PyInstaller
+extracts bundled files to a temporary directory (sys._MEIPASS), not next to the .exe.
+
+SOLUTION:
+Added resource_path() function that correctly uses sys._MEIPASS for bundled files
+when running as executable, and normal paths when running as script.
+
+WHAT TO DO:
+1. Rebuild the executable:
+   - Run: build_standalone.bat
+   - Or: py -m PyInstaller anvesh.spec --clean --noconfirm
+
+2. Test the new executable:
+   - Double-click dist\Anvesh.exe
+   - It should now find templates and static files correctly
+   - Browser should open and show the interface
+
+The fix ensures:
+- Templates are found from the bundled location
+- Static files are found from the bundled location  
+- History file is saved next to the .exe (for persistence)
+

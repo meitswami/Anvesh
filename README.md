@@ -150,4 +150,4 @@ Free to use and modify.
 
 ## Credits
 
-Created by Strik3r_12ka4 & Meit Swami. © All Rights reserved 2025.
+Created by Strik3r_12ka4 & Phantom007. © All Rights reserved 2025.
