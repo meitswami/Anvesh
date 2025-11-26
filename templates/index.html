@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anvesh - Advanced File Search</title>
+    <!-- Try local assets first, fallback to CDN -->
+    <link href="/static/vendor/bootstrap/bootstrap.min.css" rel="stylesheet" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css'">
+    <link href="/static/vendor/fontawesome/all.min.css" rel="stylesheet" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'">
+    <link href="/static/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid min-vh-100 d-flex flex-column">
+        <!-- Animated Header -->
+        <header class="text-center py-5 mb-4 animated-header">
+            <div class="logo-container">
+                <i class="fas fa-search-location logo-icon"></i>
+                <h1 class="display-3 fw-bold text-gradient mb-2">अन्वेष</h1>
+                <h2 class="h4" style="color: #ffffff;">Anvesh - Advanced File Search</h2>
+                <p class="lead mt-3" style="color: #ffffff;">Search across Word, Excel, PowerPoint, PDF, and Text files</p>
+            </div>
+        </header>
+
+        <!-- Main Content with Sidebar -->
+        <div class="container-fluid flex-grow-1">
+            <div class="row g-3">
+                <!-- Main Search Container -->
+                <div class="col-lg-8 col-xl-9">
+                    <!-- Search Card -->
+                    <div class="card shadow-lg border-0 search-card">
+                        <div class="card-body p-4">
+                            <form id="searchForm">
+                                <!-- Search Query Input -->
+                                <div class="mb-4">
+                                    <label for="searchQuery" class="form-label fw-bold">
+                                        <i class="fas fa-search me-2"></i>Search Query
+                                    </label>
+                                    <input type="text" class="form-control form-control-lg" id="searchQuery" 
+                                           placeholder="Enter your search term..." required>
+                                </div>
+
+                                <!-- Folders Selection -->
+                                <div class="mb-4">
+                                    <label for="foldersInput" class="form-label fw-bold">
+                                        <i class="fas fa-folder-open me-2"></i>Select Folders
+                                    </label>
+                                    <div class="input-group mb-2">
+                                        <button type="button" class="btn btn-outline-secondary" id="browseFoldersBtn">
+                                            <i class="fas fa-folder me-2"></i>Browse Folders
+                                        </button>
+                                        <input type="file" id="folderPicker" webkitdirectory multiple style="display: none;">
+                                    </div>
+                                    <textarea class="form-control" id="foldersInput" rows="3" 
+                                              placeholder="C:\Users\Documents&#10;C:\Projects" required></textarea>
+                                    <small class="text-muted">Enter folder paths manually (one per line) or use Browse button</small>
+                                </div>
+
+                                <!-- Options -->
+                                <div class="row mb-4">
+                                    <div class="col-md-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="exactMatch">
+                                            <label class="form-check-label" for="exactMatch">
+                                                Exact Match
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="caseSensitive">
+                                            <label class="form-check-label" for="caseSensitive">
+                                                Case Sensitive
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="searchFilenames">
+                                            <label class="form-check-label" for="searchFilenames">
+                                                Search Filenames
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Search Button -->
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary btn-lg search-btn" id="searchBtn">
+                                        <i class="fas fa-search me-2"></i>
+                                        <span class="btn-text">Search</span>
+                                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Results Section -->
+                    <div id="resultsSection" class="mt-4 d-none">
+                        <div class="card shadow-lg border-0">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-list me-2"></i>Search Results
+                                    <span class="badge bg-light text-dark ms-2" id="resultsCount">0</span>
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="resultsContainer"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- History Sidebar -->
+                <div class="col-lg-4 col-xl-3">
+                    <div class="card shadow-lg border-0 history-sidebar sticky-top" style="top: 20px;">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-history me-2"></i>Search History
+                                <button class="btn btn-sm btn-light float-end" id="refreshHistoryBtn" title="Refresh">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </h5>
+                        </div>
+                        <div class="card-body p-2" style="max-height: 70vh; overflow-y: auto;">
+                            <div id="historyContainer">
+                                <div class="text-center text-muted py-3">
+                                    <i class="fas fa-clock fa-2x mb-2"></i>
+                                    <p>No search history yet</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="text-center py-3 mt-auto">
+            <p class="text-muted mb-0">
+                 <i class="fas fa-code me-2"></i> <span style="color: orange;"> Created by <b>Strik3r_12ka4</b> & <b>Phantom007</b>. © All Rights reserved 2025.</span>
+            </p>
+        </footer>
+    </div>
+
+    <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'"></script>
+    <script src="/static/script.js"></script>
+</body>
+</html>
+
