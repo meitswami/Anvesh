@@ -1,0 +1,91 @@
+[
+  {
+    "timestamp": "2025-11-28 12:33:30",
+    "query": "harsh",
+    "folders": [
+      "test"
+    ],
+    "results_count": 0,
+    "exact_match": false,
+    "case_sensitive": false,
+    "search_filenames": false
+  },
+  {
+    "timestamp": "2025-11-28 12:33:38",
+    "query": "harsh",
+    "folders": [
+      "test"
+    ],
+    "results_count": 0,
+    "exact_match": false,
+    "case_sensitive": false,
+    "search_filenames": false
+  },
+  {
+    "timestamp": "2025-11-28 12:33:46",
+    "query": "harsh",
+    "folders": [
+      "test"
+    ],
+    "results_count": 0,
+    "exact_match": false,
+    "case_sensitive": false,
+    "search_filenames": false
+  },
+  {
+    "timestamp": "2025-11-28 12:34:04",
+    "query": "harsh",
+    "folders": [
+      "test"
+    ],
+    "results_count": 0,
+    "exact_match": false,
+    "case_sensitive": false,
+    "search_filenames": false
+  },
+  {
+    "timestamp": "2025-11-28 12:34:11",
+    "query": "harsh",
+    "folders": [
+      "test",
+      "C:\\Users\\PC-2\\Documents\\test"
+    ],
+    "results_count": 2,
+    "exact_match": false,
+    "case_sensitive": false,
+    "search_filenames": false
+  },
+  {
+    "timestamp": "2025-11-28 12:37:57",
+    "query": "harsh",
+    "folders": [
+      "C:\\Users\\PC-2\\Documents\\test"
+    ],
+    "results_count": 2,
+    "exact_match": false,
+    "case_sensitive": false,
+    "search_filenames": false
+  },
+  {
+    "timestamp": "2025-11-28 12:41:06",
+    "query": "harsh",
+    "folders": [
+      "C:\\Users\\PC-2\\Documents\\test"
+    ],
+    "results_count": 2,
+    "exact_match": false,
+    "case_sensitive": false,
+    "search_filenames": false
+  },
+  {
+    "timestamp": "2025-11-28 12:51:06",
+    "query": "harsh",
+    "folders": [
+      "C:\\Users\\PC-2\\Documents\\test"
+    ],
+    "results_count": 2,
+    "exact_match": false,
+    "case_sensitive": false,
+    "search_filenames": false
+  }
+]

@@ -18,6 +18,9 @@
                 <h1 class="display-3 fw-bold text-gradient mb-2">अन्वेष</h1>
                 <h2 class="h4" style="color: #ffffff;">Anvesh - Advanced File Search</h2>
                 <p class="lead mt-3" style="color: #ffffff;">Search across Word, Excel, PowerPoint, PDF, and Text files</p>
+                <a href="/ai" class="btn btn-outline-light btn-lg mt-3">
+                    <i class="fas fa-robot me-2"></i>AI Features (OCR, Face Detection, Object Detection)
+                </a>
             </div>
         </header>
 
@@ -44,15 +47,26 @@
                                     <label for="foldersInput" class="form-label fw-bold">
                                         <i class="fas fa-folder-open me-2"></i>Select Folders
                                     </label>
-                                    <div class="input-group mb-2">
-                                        <button type="button" class="btn btn-outline-secondary" id="browseFoldersBtn">
-                                            <i class="fas fa-folder me-2"></i>Browse Folders
-                                        </button>
-                                        <input type="file" id="folderPicker" webkitdirectory multiple style="display: none;">
+                                    <div id="foldersList" class="mb-2">
+                                        <!-- Folders will be added here dynamically -->
                                     </div>
-                                    <textarea class="form-control" id="foldersInput" rows="3" 
-                                              placeholder="C:\Users\Documents&#10;C:\Projects" required></textarea>
-                                    <small class="text-muted">Enter folder paths manually (one per line) or use Browse button</small>
+                                    <div class="input-group mb-2">
+                                        <button type="button" class="btn btn-outline-primary" id="browseFoldersBtn">
+                                            <i class="fas fa-folder me-2"></i>Browse Folder
+                                        </button>
+                                        <button type="button" class="btn btn-outline-success" id="addFolderBtn">
+                                            <i class="fas fa-plus me-2"></i>Add Folder Path
+                                        </button>
+                                        <input type="file" id="folderPicker" webkitdirectory style="display: none;">
+                                    </div>
+                                    <textarea class="form-control" id="foldersInput" rows="2" 
+                                              placeholder="Or type folder path here and press Enter..." style="display: none;"></textarea>
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        <strong>Note:</strong> Browser security limits folder path access. 
+                                        Use "Add Folder Path" to type the full path manually (e.g., C:\Users\Documents).
+                                        "Browse Folder" will prompt you to enter the path.
+                                    </small>
                                 </div>
 
                                 <!-- Options -->
@@ -99,10 +113,21 @@
                     <div id="resultsSection" class="mt-4 d-none">
                         <div class="card shadow-lg border-0">
                             <div class="card-header bg-primary text-white">
-                                <h5 class="mb-0">
-                                    <i class="fas fa-list me-2"></i>Search Results
-                                    <span class="badge bg-light text-dark ms-2" id="resultsCount">0</span>
-                                </h5>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-list me-2"></i>Search Results
+                                        <span class="badge bg-light text-dark ms-2" id="resultsCount">0</span>
+                                    </h5>
+                                    <div id="searchTimeInfo" class="text-white">
+                                        <small><i class="fas fa-clock me-1"></i><span id="elapsedTime">0s</span></small>
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <div class="progress" style="height: 4px; display: none;" id="searchProgress">
+                                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                                    </div>
+                                    <small id="searchStatus" class="d-block mt-1">Ready to search...</small>
+                                </div>
                             </div>
                             <div class="card-body">
                                 <div id="resultsContainer"></div>
