@@ -377,13 +377,47 @@ body {
 }
 
 /* Folder Browser Button */
-#browseFoldersBtn {
+#browseFoldersBtn, #addFolderBtn {
     border-radius: 10px;
     transition: all 0.3s ease;
 }
 
-#browseFoldersBtn:hover {
+#browseFoldersBtn:hover, #addFolderBtn:hover {
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Clickable file and match items */
+.clickable-file, .clickable-match {
+    transition: all 0.2s ease;
+}
+
+.clickable-file:hover, .clickable-match:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+}
+
+.clickable-file:hover {
+    color: #667eea !important;
+}
+
+/* Progress bar */
+#searchProgress {
+    margin-top: 10px;
+}
+
+#searchStatus {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Folder list */
+#foldersList .input-group {
+    margin-bottom: 8px;
+}
+
+#foldersList input[readonly] {
+    background-color: #f8f9fa;
+    cursor: default;
 }
 

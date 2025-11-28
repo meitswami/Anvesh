@@ -1,8 +1,8 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, AsyncGenerator
 import os
 import sys
 import asyncio
@@ -10,6 +10,15 @@ from pathlib import Path
 import re
 from datetime import datetime
 import json
+import time
+
+# Import AI features
+try:
+    from ai_features import ai_features
+    AI_FEATURES_AVAILABLE = True
+except ImportError:
+    AI_FEATURES_AVAILABLE = False
+    ai_features = None
 
 # File type handlers
 try:
@@ -304,11 +313,88 @@ def log_search_history(query: str, folders: List[str], results_count: int, exact
     except Exception as e:
         print(f"Error logging search history: {e}")
 
-async def search_files(search_request: SearchRequest) -> List[FileResult]:
-    """Search for query in all files across selected folders"""
+async def search_files_streaming(search_request: SearchRequest):
+    """Search for query in all files and yield results as they're found"""
     all_files = []
     
-    # Collect all files from selected folders (always get all files, don't filter by filename)
+    # Collect all files from selected folders
+    for folder in search_request.folders:
+        if os.path.isdir(folder):
+            all_files.extend(get_supported_files(folder))
+    
+    total_files = len(all_files)
+    files_processed = 0
+    results_count = 0
+    
+    # Send initial status
+    yield f"data: {json.dumps({'type': 'status', 'total_files': total_files, 'files_processed': 0, 'message': f'Found {total_files} files to search...'})}\n\n"
+    
+    # Search in each file
+    for file_path in all_files:
+        files_processed += 1
+        ext = os.path.splitext(file_path)[1].lower()
+        matches = []
+        
+        # If filename search was requested, check filename match
+        if search_request.search_filenames:
+            filename = os.path.basename(file_path)
+            if search_request.case_sensitive:
+                search_filename = filename
+                search_query = search_request.query
+            else:
+                search_filename = filename.lower()
+                search_query = search_request.query.lower()
+            
+            if search_query in search_filename:
+                count = search_filename.count(search_query)
+                matches.append(SearchResult(
+                    file_path=file_path,
+                    line_number=None,
+                    content=f"Filename match: {filename}",
+                    occurrences=count
+                ))
+        
+        # Always search file contents
+        if ext == '.txt':
+            content_matches = search_txt(file_path, search_request.query, search_request.exact_match, search_request.case_sensitive)
+            matches.extend(content_matches)
+        elif ext in ['.docx', '.doc']:
+            content_matches = search_docx(file_path, search_request.query, search_request.exact_match, search_request.case_sensitive)
+            matches.extend(content_matches)
+        elif ext in ['.xlsx', '.xls']:
+            content_matches = search_xlsx(file_path, search_request.query, search_request.exact_match, search_request.case_sensitive)
+            matches.extend(content_matches)
+        elif ext in ['.pptx', '.ppt']:
+            content_matches = search_pptx(file_path, search_request.query, search_request.exact_match, search_request.case_sensitive)
+            matches.extend(content_matches)
+        elif ext == '.pdf':
+            content_matches = search_pdf(file_path, search_request.query, search_request.exact_match, search_request.case_sensitive)
+            matches.extend(content_matches)
+        
+        # If file has matches, send it immediately
+        if matches:
+            results_count += 1
+            total_occurrences = sum(m.occurrences for m in matches)
+            file_result = FileResult(
+                file_path=file_path,
+                total_occurrences=total_occurrences,
+                matches=matches
+            )
+            yield f"data: {json.dumps({'type': 'result', 'data': file_result.model_dump()})}\n\n"
+        
+        # Send progress update every 10 files or on last file
+        if files_processed % 10 == 0 or files_processed == total_files:
+            progress = int((files_processed / total_files) * 100) if total_files > 0 else 0
+            yield f"data: {json.dumps({'type': 'progress', 'files_processed': files_processed, 'total_files': total_files, 'progress': progress, 'results_found': results_count})}\n\n"
+    
+    # Send completion
+    yield f"data: {json.dumps({'type': 'complete', 'total_results': results_count})}\n\n"
+
+async def search_files(search_request: SearchRequest) -> List[FileResult]:
+    """Search for query in all files across selected folders (non-streaming version for compatibility)"""
+    all_files = []
+    
+    # Collect all files from selected folders
     for folder in search_request.folders:
         if os.path.isdir(folder):
             all_files.extend(get_supported_files(folder))
@@ -331,7 +417,6 @@ async def search_files(search_request: SearchRequest) -> List[FileResult]:
                 search_query = search_request.query.lower()
             
             if search_query in search_filename:
-                # Count occurrences in filename
                 count = search_filename.count(search_query)
                 matches.append(SearchResult(
                     file_path=file_path,
@@ -340,7 +425,7 @@ async def search_files(search_request: SearchRequest) -> List[FileResult]:
                     occurrences=count
                 ))
         
-        # Always search file contents (regardless of filename search setting)
+        # Always search file contents
         if ext == '.txt':
             content_matches = search_txt(file_path, search_request.query, search_request.exact_match, search_request.case_sensitive)
             matches.extend(content_matches)
@@ -357,7 +442,6 @@ async def search_files(search_request: SearchRequest) -> List[FileResult]:
             content_matches = search_pdf(file_path, search_request.query, search_request.exact_match, search_request.case_sensitive)
             matches.extend(content_matches)
         
-        # Include file in results if it has any matches (filename OR content)
         if matches:
             total_occurrences = sum(m.occurrences for m in matches)
             file_results.append(FileResult(
@@ -379,7 +463,38 @@ async def read_root():
 
 @app.post("/api/search")
 async def search(search_request: SearchRequest):
-    """Search endpoint"""
+    """Search endpoint - streaming results"""
+    async def generate():
+        start_time = time.time()
+        results_count = 0
+        
+        async for chunk in search_files_streaming(search_request):
+            yield chunk
+            # Parse chunk to get results count
+            if chunk.startswith("data: "):
+                try:
+                    data = json.loads(chunk[6:])
+                    if data.get('type') == 'result':
+                        results_count += 1
+                    elif data.get('type') == 'complete':
+                        results_count = data.get('total_results', results_count)
+                        # Log search history after completion
+                        log_search_history(
+                            search_request.query,
+                            search_request.folders,
+                            results_count,
+                            search_request.exact_match,
+                            search_request.case_sensitive,
+                            search_request.search_filenames
+                        )
+                except:
+                    pass
+    
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+@app.post("/api/search-sync")
+async def search_sync(search_request: SearchRequest):
+    """Synchronous search endpoint (for compatibility)"""
     try:
         results = await search_files(search_request)
         results_count = len(results)
@@ -394,7 +509,7 @@ async def search(search_request: SearchRequest):
             search_request.search_filenames
         )
         
-        return JSONResponse(content={"results": [r.dict() for r in results]})
+        return JSONResponse(content={"results": [r.model_dump() for r in results]})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -421,16 +536,315 @@ async def get_history():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/open-file")
+async def open_file(request: dict):
+    """Open file with default application, optionally at specific line"""
+    import subprocess
+    import platform
+    import shutil
+    
+    file_path = request.get("path")
+    line_number = request.get("line")
+    
+    if not file_path or not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    try:
+        system = platform.system()
+        file_ext = os.path.splitext(file_path)[1].lower()
+        
+        # Text file extensions that support line numbers
+        text_extensions = ('.txt', '.py', '.js', '.html', '.css', '.json', '.md', '.xml', 
+                          '.yaml', '.yml', '.ini', '.cfg', '.conf', '.log', '.bat', '.ps1',
+                          '.sh', '.sql', '.java', '.cpp', '.c', '.h', '.hpp', '.cs', '.php',
+                          '.rb', '.go', '.rs', '.swift', '.kt', '.scala', '.r', '.m', '.pl')
+        
+        if system == "Windows":
+            opened = False
+            
+            # Try to open with line number support for text files
+            if line_number and file_ext in text_extensions:
+                # Try VS Code - check in common installation paths and PATH
+                vscode_paths = [
+                    r'C:\Program Files\Microsoft VS Code\Code.exe',
+                    r'C:\Program Files (x86)\Microsoft VS Code\Code.exe',
+                    os.path.expanduser(r'~\AppData\Local\Programs\Microsoft VS Code\Code.exe')
+                ]
+                
+                # Check if code is in PATH (but don't use shell=True to avoid error messages)
+                code_in_path = shutil.which('code')
+                if code_in_path:
+                    vscode_paths.insert(0, code_in_path)
+                
+                # Try VS Code from known paths
+                for vscode_path in vscode_paths:
+                    if os.path.exists(vscode_path) or (code_in_path and vscode_path == code_in_path):
+                        try:
+                            # Use CREATE_NO_WINDOW flag to prevent console window
+                            subprocess.Popen([vscode_path, '--goto', f'{file_path}:{line_number}'], 
+                                            stdout=subprocess.DEVNULL, 
+                                            stderr=subprocess.DEVNULL,
+                                            creationflags=subprocess.CREATE_NO_WINDOW)
+                            opened = True
+                            break
+                        except:
+                            pass
+                
+                # Try Notepad++ if VS Code failed
+                if not opened:
+                    npp_paths = [
+                        r'C:\Program Files\Notepad++\notepad++.exe',
+                        r'C:\Program Files (x86)\Notepad++\notepad++.exe',
+                        os.path.expanduser(r'~\AppData\Local\Programs\Notepad++\notepad++.exe')
+                    ]
+                    for npp_path in npp_paths:
+                        if os.path.exists(npp_path):
+                            try:
+                                subprocess.Popen([npp_path, file_path, '-n' + str(line_number)], 
+                                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                opened = True
+                                break
+                            except:
+                                pass
+                
+                # Try Sublime Text
+                if not opened:
+                    sublime_paths = [
+                        r'C:\Program Files\Sublime Text\sublime_text.exe',
+                        r'C:\Program Files (x86)\Sublime Text\sublime_text.exe'
+                    ]
+                    for sublime_path in sublime_paths:
+                        if os.path.exists(sublime_path):
+                            try:
+                                subprocess.Popen([sublime_path, f'{file_path}:{line_number}'], 
+                                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                opened = True
+                                break
+                            except:
+                                pass
+            
+            # If no line number or couldn't open with editor, use default application
+            if not opened:
+                try:
+                    os.startfile(file_path)
+                    opened = True
+                except Exception as e:
+                    # Last resort: try with subprocess start command (Windows only)
+                    try:
+                        # Use CREATE_NO_WINDOW to prevent console window from appearing
+                        subprocess.Popen(['cmd', '/c', 'start', '', file_path], 
+                                        stdout=subprocess.DEVNULL, 
+                                        stderr=subprocess.DEVNULL,
+                                        creationflags=subprocess.CREATE_NO_WINDOW)
+                        opened = True
+                    except:
+                        raise HTTPException(status_code=500, detail=f"Could not open file: {str(e)}")
+            
+            if opened:
+                return {"status": "ok", "message": "File opened"}
+            else:
+                raise HTTPException(status_code=500, detail="Could not open file with any available application")
+                
+        elif system == "Darwin":  # macOS
+            if line_number and file_ext in text_extensions:
+                # Try VS Code - check in common installation paths
+                vscode_paths = [
+                    '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
+                    os.path.expanduser('~/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code')
+                ]
+                code_in_path = shutil.which('code')
+                if code_in_path:
+                    vscode_paths.insert(0, code_in_path)
+                
+                for vscode_path in vscode_paths:
+                    if os.path.exists(vscode_path) or (code_in_path and vscode_path == code_in_path):
+                        try:
+                            subprocess.Popen([vscode_path, '--goto', f'{file_path}:{line_number}'],
+                                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            return {"status": "ok", "message": "File opened"}
+                        except:
+                            pass
+                        break
+                # Fallback to TextEdit
+                subprocess.Popen(['open', '-a', 'TextEdit', file_path],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                subprocess.Popen(['open', file_path],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return {"status": "ok", "message": "File opened"}
+            
+        else:  # Linux
+            if line_number and file_ext in text_extensions:
+                # Try VS Code - check in common installation paths
+                vscode_paths = [
+                    '/usr/bin/code',
+                    '/usr/local/bin/code',
+                    os.path.expanduser('~/.local/share/code/code')
+                ]
+                code_in_path = shutil.which('code')
+                if code_in_path:
+                    vscode_paths.insert(0, code_in_path)
+                
+                for vscode_path in vscode_paths:
+                    if os.path.exists(vscode_path) or (code_in_path and vscode_path == code_in_path):
+                        try:
+                            subprocess.Popen([vscode_path, '--goto', f'{file_path}:{line_number}'],
+                                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            return {"status": "ok", "message": "File opened"}
+                        except:
+                            pass
+                        break
+            subprocess.Popen(['xdg-open', file_path],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return {"status": "ok", "message": "File opened"}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error opening file: {str(e)}")
+
 @app.get("/api/health")
 async def health():
     """Health check endpoint"""
-    return {
+    health_data = {
         "status": "ok",
         "docx": DOCX_AVAILABLE,
         "xlsx": XLSX_AVAILABLE,
         "pptx": PPTX_AVAILABLE,
         "pdf": PDF_AVAILABLE
     }
+    
+    if AI_FEATURES_AVAILABLE and ai_features:
+        health_data["ai_features"] = ai_features.get_capabilities()
+    else:
+        health_data["ai_features"] = {"available": False}
+    
+    return health_data
+
+# ==================== AI Features Routes ====================
+
+@app.get("/ai", response_class=HTMLResponse)
+async def ai_features_page():
+    """Serve the AI features page"""
+    template_path = resource_path("templates/ai_features.html")
+    if not os.path.exists(template_path):
+        return HTMLResponse(content="<h1>AI Features page not found</h1>", status_code=500)
+    with open(template_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/api/ai/capabilities")
+async def get_ai_capabilities():
+    """Get available AI capabilities"""
+    if not AI_FEATURES_AVAILABLE:
+        return JSONResponse(content={"available": False, "error": "AI features not available"})
+    
+    return JSONResponse(content=ai_features.get_capabilities())
+
+class FilePathRequest(BaseModel):
+    file_path: str
+    frame_interval: Optional[int] = 30
+    confidence: Optional[float] = 0.25
+    threshold: Optional[float] = 0.6
+
+class FaceMatchRequest(BaseModel):
+    image1_path: str
+    image2_path: Optional[str] = None
+    reference_image_path: Optional[str] = None
+    folder_path: Optional[str] = None
+    threshold: float = 0.6
+
+@app.post("/api/ai/ocr/image")
+async def ocr_image(request: FilePathRequest):
+    """Extract text from image using OCR"""
+    if not AI_FEATURES_AVAILABLE:
+        raise HTTPException(status_code=503, detail="AI features not available")
+    
+    if not os.path.exists(request.file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    result = ai_features.extract_text_from_image(request.file_path)
+    return JSONResponse(content=result)
+
+@app.post("/api/ai/ocr/video")
+async def ocr_video(request: FilePathRequest):
+    """Extract text from video using OCR"""
+    if not AI_FEATURES_AVAILABLE:
+        raise HTTPException(status_code=503, detail="AI features not available")
+    
+    if not os.path.exists(request.file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    result = ai_features.extract_text_from_video(request.file_path, request.frame_interval or 30)
+    return JSONResponse(content=result)
+
+@app.post("/api/ai/detect/objects")
+async def detect_objects(request: FilePathRequest):
+    """Detect objects in image"""
+    if not AI_FEATURES_AVAILABLE:
+        raise HTTPException(status_code=503, detail="AI features not available")
+    
+    if not os.path.exists(request.file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    result = ai_features.detect_objects(request.file_path, request.confidence or 0.25)
+    return JSONResponse(content=result)
+
+@app.post("/api/ai/detect/faces")
+async def detect_faces(request: FilePathRequest):
+    """Detect faces in image"""
+    if not AI_FEATURES_AVAILABLE:
+        raise HTTPException(status_code=503, detail="AI features not available")
+    
+    if not os.path.exists(request.file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    result = ai_features.detect_faces(request.file_path)
+    return JSONResponse(content=result)
+
+@app.post("/api/ai/detect/faces/video")
+async def detect_faces_video(request: FilePathRequest):
+    """Detect faces in video"""
+    if not AI_FEATURES_AVAILABLE:
+        raise HTTPException(status_code=503, detail="AI features not available")
+    
+    if not os.path.exists(request.file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    result = ai_features.detect_faces_in_video(request.file_path, request.frame_interval or 30)
+    return JSONResponse(content=result)
+
+@app.post("/api/ai/match/faces")
+async def match_faces(request: FaceMatchRequest):
+    """Match faces between two images"""
+    if not AI_FEATURES_AVAILABLE:
+        raise HTTPException(status_code=503, detail="AI features not available")
+    
+    if not request.image2_path:
+        raise HTTPException(status_code=400, detail="image2_path is required")
+    
+    if not os.path.exists(request.image1_path) or not os.path.exists(request.image2_path):
+        raise HTTPException(status_code=404, detail="One or both images not found")
+    
+    result = ai_features.match_faces(request.image1_path, request.image2_path, request.threshold)
+    return JSONResponse(content=result)
+
+@app.post("/api/ai/match/faces/folder")
+async def find_matching_faces(request: FaceMatchRequest):
+    """Find matching faces in folder"""
+    if not AI_FEATURES_AVAILABLE:
+        raise HTTPException(status_code=503, detail="AI features not available")
+    
+    if not request.reference_image_path or not request.folder_path:
+        raise HTTPException(status_code=400, detail="reference_image_path and folder_path are required")
+    
+    if not os.path.exists(request.reference_image_path):
+        raise HTTPException(status_code=404, detail="Reference image not found")
+    
+    if not os.path.isdir(request.folder_path):
+        raise HTTPException(status_code=404, detail="Folder not found")
+    
+    result = ai_features.find_matching_faces_in_folder(request.reference_image_path, request.folder_path, request.threshold)
+    return JSONResponse(content=result)
 
 if __name__ == "__main__":
     import uvicorn

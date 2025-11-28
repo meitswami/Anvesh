@@ -1,6 +1,8 @@
 # अन्वेष (Anvesh) - Advanced File Search Tool
 
-A beautiful, animated GUI application for searching text across multiple file types in Windows 11.
+A beautiful, animated GUI application for searching text across multiple file types in Windows 11, with powerful AI features including OCR, Object Detection, and Face Recognition.
+
+> **📖 For AI Features Guide**: See [AI_MODULE_README.md](AI_MODULE_README.md)
 
 ## Features
 
@@ -13,28 +15,33 @@ A beautiful, animated GUI application for searching text across multiple file ty
 - 📜 **Search History**: Right sidebar with search history and timestamps
 - 📂 **Folder Browser**: Browse and select folders or type paths manually
 - 💾 **Portable**: Can be built as standalone executable (no Python needed)
+- 🤖 **AI Features**: OCR, Object Detection, Face Detection & Matching (see [AI_MODULE_README.md](AI_MODULE_README.md))
 
-## Installation
+## 🚀 Quick Start
 
-### Option 1: Run from Source
+### Easiest Way:
+1. **Double-click `run.bat`** - It will check Python, install dependencies, and start the server
+2. **Browser opens automatically** at `http://127.0.0.1:8000`
+3. **Start searching!**
 
-1. **Install Python 3.8+** if not already installed
-
-2. **Install dependencies**:
+### Manual Start:
+1. **Install dependencies** (first time only):
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Start the server**:
+2. **Start the server**:
    ```bash
    python app.py
    ```
    Or double-click `run.bat`
 
-4. **Open your browser** and navigate to:
+3. **Open browser** to:
    ```
    http://127.0.0.1:8000
    ```
+
+> **📖 Detailed Guide**: See [QUICK_START.md](QUICK_START.md) for step-by-step instructions
 
 ### Option 2: Standalone Executable (Portable)
 
@@ -94,33 +101,46 @@ This downloads Bootstrap and FontAwesome locally. The app will use local files i
 
 ```
 Word finder tool/
-├── app.py                  # FastAPI backend server
-├── anvesh.spec            # PyInstaller configuration
-├── build_standalone.bat   # Build script for executable
-├── download_assets.py     # Download offline assets
-├── run.bat                # Quick start script
-├── requirements.txt       # Python dependencies
-├── search_history.json    # Search history (created on first search)
+├── app.py                      # FastAPI backend server
+├── ai_features.py              # AI features module (OCR, Face Detection, etc.)
+├── anvesh.spec                 # PyInstaller configuration
+├── build_standalone.bat        # Build script for executable
+├── install_ai_features.bat     # Install AI features (Windows)
+├── install_ai_features.ps1     # Install AI features (PowerShell)
+├── download_assets.py           # Download offline assets (optional)
+├── run.bat                     # Quick start script
+├── requirements.txt            # Python dependencies
+├── README.md                   # Main documentation
+├── AI_MODULE_README.md         # AI features complete guide
 ├── templates/
-│   └── index.html        # Main HTML interface
+│   ├── index.html             # Main search interface
+│   └── ai_features.html       # AI features interface
 ├── static/
-│   ├── style.css         # Animated CSS styles
-│   ├── script.js         # Frontend JavaScript
-│   └── vendor/           # Offline assets (if downloaded)
-└── README.md             # This file
+│   ├── style.css              # Animated CSS styles
+│   ├── script.js              # Main frontend JavaScript
+│   ├── ai_features.js         # AI features JavaScript
+│   └── vendor/                # Offline assets (Bootstrap, FontAwesome)
+└── search_history.json         # Search history (created on first search)
 ```
 
 ## Building Standalone Executable
 
-The standalone executable includes:
-- Python runtime
-- All dependencies
-- Templates and static files
-- Everything needed to run
+1. **Build the executable:**
+   - Double-click `build_standalone.bat`
+   - Or run: `py -m PyInstaller anvesh.spec --clean --noconfirm`
 
-**File size**: ~50-100 MB
+2. **Find the executable:**
+   - Location: `dist\Anvesh.exe`
+   - Copy this single file to any Windows PC
+   - No Python installation needed!
 
-**Note**: Antivirus may flag it initially (false positive for PyInstaller executables). This is normal.
+3. **Notes:**
+   - First startup takes 5-10 seconds (extracting files)
+   - Console window shows startup messages
+   - Browser opens automatically after server starts
+   - Keep console window open while using Anvesh
+   - File size: ~25-35 MB
+   - Antivirus may flag it initially (false positive for PyInstaller executables)
 
 ## Troubleshooting
 
